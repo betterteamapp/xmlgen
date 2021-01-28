@@ -115,7 +115,7 @@ type Uri = T.Text -- must not be empty
 type Name = T.Text
 
 nameBuilder :: Name -> Builder
-nameBuilder = fromText
+nameBuilder n = fromText $ T.filter (/= '\n') n
 
 -- | Type for representing presence or absence of an XML namespace.
 data Namespace
@@ -185,12 +185,10 @@ defaultDocInfo = DocInfo { docInfo_standalone = True
 -- | Constructs an XML document from a 'DocInfo' value and the root element.
 doc :: DocInfo -> Xml Elem -> Xml Doc
 doc di rootElem = Xml $
-    do let prologBuf = fromString "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"" <>
-                       fromString (if standalone then "yes" else "no") <>
-                       fromString "\"?>\n" <>
+    do let prologBuf = fromString "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" <>
                        case mDocType of
                          Nothing -> mempty
-                         Just s -> fromString s <> fromString "\n"
+                         Just s -> fromString s
        env <- ask
        let Doc preBuf = fst $ runXml env preMisc
            Elem elemBuf = fst $ runXml env rootElem
@@ -210,7 +208,10 @@ doc di rootElem = Xml $
 type TextContent = T.Text
 
 textBuilder :: TextContent -> Builder
-textBuilder = fromText . escapeText
+textBuilder t = fromText $ T.filter (/= '\n') t
+
+stringBuilder :: String -> Builder
+stringBuilder s = fromString $ filter (/= '\n') s
 
 -- | Constructs a text node by escaping the given argument.
 xtext :: TextContent -> Xml Elem
@@ -325,27 +326,27 @@ class AddChildren c where
 instance AddChildren (Xml Attr) where
     addChildren attrs uriMap =
        let (Attr builder', _) = runXml uriMap attrs
-       in builder' <> fromString "\n>"
+       in builder' <> fromString ">"
 
 instance AddChildren (Xml Elem) where
     addChildren elems uriMap =
        let (Elem builder', _) = runXml uriMap elems
-       in fromString "\n>" `mappend` builder'
+       in fromString ">" `mappend` builder'
 
 instance AddChildren (Xml Attr, Xml Elem) where
     addChildren (attrs, elems) uriMap =
         let (Attr builder, uriMap') = runXml uriMap attrs
             (Elem builder', _) = runXml uriMap' elems
-        in builder `mappend` fromString "\n>" `mappend` builder'
+        in builder `mappend` fromString ">" `mappend` builder'
 
 instance AddChildren (Xml Attr, [Xml Elem]) where
     addChildren (attrs, elems) uriMap = addChildren (attrs, xelems elems) uriMap
 
 instance AddChildren TextContent where
-    addChildren t _ = fromChar '>' <> textBuilder t
+    addChildren t _ = fromString "><![CDATA[" <> textBuilder t <> fromString "]]"
 
 instance AddChildren String where
-    addChildren t _ = fromChar '>' <> fromString t
+    addChildren t _ = fromString "><![CDATA[" <> stringBuilder t <> fromString "]]"
 
 instance AddChildren () where
     addChildren _ _ = fromChar '>'
@@ -378,7 +379,7 @@ xelemQ ns' name children = Xml $
        let b1 = fromString "<"
        let b2 = b1 `mappend` elemNameBuilder `mappend` nsDeclBuilder
        let b3 = b2 `mappend` addChildren children uriMap
-       let builderOut = Elem (b3 `mappend` fromString "</" `mappend` elemNameBuilder `mappend` fromString "\n>")
+       let builderOut = Elem (b3 `mappend` fromString "</" `mappend` elemNameBuilder `mappend` fromString ">")
        return (builderOut, oldUriMap)
 
 -- | Construct an element without any children.

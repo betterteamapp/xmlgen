@@ -193,7 +193,7 @@ qcAsTest name prop =
       checkProp =
           do res <- Q.quickCheckResult prop
              case res of
-               Q.Success _ _ _ -> return ()
+               Q.Success _ _ _ _ _ _ -> return ()
                _ -> H.assertFailure ("QC property " ++ name ++ " failed: "
                                      ++ show res)
 
